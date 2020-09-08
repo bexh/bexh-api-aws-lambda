@@ -9,10 +9,10 @@ pip3 install pipenv
 pipenv shell --python 3.8
 ```
 
-Install python-lambda:
+Install pipfile:
 
 ```
-pip3 install python-lambda
+make install
 ```
 
 ### Set up interpreter:
