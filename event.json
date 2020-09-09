@@ -4,7 +4,9 @@
   "httpMethod": "POST",
   "headers": {
     "foo": "bar",
-    "Content-Type": "application/json"
+    "Content-Type": "application/json",
+    "user": "seth",
+    "token": "foo"
   },
   "multiValueHeaders": {
     "foo": [

@@ -21,7 +21,7 @@ class Core:
                 response = Response(body={"error": "Page not found"}, status_code=404)
                 self.logger.info(f"Response: {response.serialize()}")
                 return response
-            response = controller()
+            response = controller(request)
             self.logger.info(f"Response: {response}")
             return response
         except Exception as e:

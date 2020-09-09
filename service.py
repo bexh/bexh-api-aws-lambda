@@ -1,5 +1,5 @@
 import json
-from src.Core import Core
+from src.core import Core
 
 
 def handler(event, context):

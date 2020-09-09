@@ -13,3 +13,12 @@ install:
 build:
 	pip freeze > requirements.txt
 	lambda build
+
+docker-up:
+	docker-compose up -d
+
+docker-down:
+	docker-compose down
+
+local-setup:
+	python scripts/local_setup.py

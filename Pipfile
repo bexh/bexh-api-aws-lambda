@@ -4,9 +4,12 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 
 [dev-packages]
+awscli-local="*"
+# python-lambda="*"
 
 [packages]
-python-lambda="*"
+boto3="*"
+pymysql="*"
 
 [requires]
 python_version = "3.8"

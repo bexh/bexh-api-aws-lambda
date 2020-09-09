@@ -1,5 +1,6 @@
 import json
 from typing import Literal
+import functools
 
 
 class Request:
@@ -41,3 +42,14 @@ class Route:
         if not self.methods or method in self.methods:
             return True
         return False
+
+
+def singleton(cls):
+    """Make a class a Singleton class (only one instance)"""
+    @functools.wraps(cls)
+    def wrapper_singleton(*args, **kwargs):
+        if not wrapper_singleton.instance:
+            wrapper_singleton.instance = cls(*args, **kwargs)
+        return wrapper_singleton.instance
+    wrapper_singleton.instance = None
+    return wrapper_singleton

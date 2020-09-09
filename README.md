@@ -9,10 +9,10 @@ pip3 install pipenv
 pipenv shell --python 3.8
 ```
 
-Install pipfile:
+Install pipfile libraries:
 
 ```
-make install
+make install-dev
 ```
 
 ### Set up interpreter:
@@ -29,8 +29,14 @@ Select the python file as per your virtual environment which can be found using:
 ```
 which python
 ```
-
 Apply > Ok
+
+### Configure Local Infra
+Set up mysql and aws localstack containers and set up db tables:
+```
+make docker-up
+make local-setup
+```
 
 ## Running the Project
 
@@ -43,6 +49,19 @@ Locate the examples in /controllers.py
 
 ## Help
 
+Make Targets:
+```
+Commands:
+    build          Bundle package for deployment
+    install        Installs pipfile libraries
+    install-dev    Installs pipfile libraries for development purposes
+    docker-up      Spins up localstack and mysql containers for local development
+    docker-down    Spins down containers for local development
+    local-setup    Creates a mysql instance and creates tables
+    
+```
+
+Lambda Commands:
 ```
 Commands:
   build      Bundles package for deployment.
