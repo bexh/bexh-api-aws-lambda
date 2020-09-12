@@ -1,6 +1,6 @@
-from src.flask_lite import FlaskLite
-from src.utils import Response, Request
-from src.db import login_required, MySql
+from main.src.flask_lite import FlaskLite
+from main.src.utils import Response, Request
+from main.src.db import login_required, MySql
 
 flask = FlaskLite()
 app = flask.app

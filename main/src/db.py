@@ -2,7 +2,7 @@ import boto3
 from botocore.exceptions import ClientError
 import pymysql
 
-from src.utils import Request, Response
+from main.src.utils import Request, Response
 
 
 def login_required(f):

@@ -12,7 +12,6 @@ install:
 
 build:
 	pip freeze > requirements.txt
-	lambda build
 
 docker-up:
 	docker-compose up -d

@@ -1,13 +1,13 @@
 import logging
-from src.controllers import *
-from src.utils import Request, Response
+from main.src.controllers import *
+from main.src.utils import Request, Response
 
 
 class Core:
-    flask = FlaskLite()
 
     def __init__(self):
-        self.app = flask.app
+        self.flask = FlaskLite()
+        self.app = self.flask.app
         self.logger = logging.Logger(name="bexh-api-aws-lambda")
 
     def run(self, event, context) -> Response:
