@@ -15,16 +15,18 @@ clean:
 	rm -rf bexh-api-aws-lambda.zip
 
 build:
-	python3 -m venv venv
-	ls -a
-	. venv/bin/activate
-	python -m pip install --upgrade pip
-	pip install -r requirements.txt
-	# . deactivate
-	cd venv/lib/python3.8/site-packages
-	zip -r9 ${OLDPWD}/bexh-api-aws-lambda.zip .
-	cd $OLDPWD
-	zip -g -r bexh-api-aws-lambda.zip ./main/
+	{ \
+  	set -e ;\
+	python3 -m venv venv ;\
+	. venv/bin/activate ;\
+	python -m pip install --upgrade pip ;\
+	pip install -r requirements.txt ;\
+	mkdir -p dist ;\
+	cd venv/lib/python3.8/site-packages ;\
+	zip -r9 $${OLDPWD}/dist/bexh-api-aws-lambda.zip . ;\
+	cd $${OLDPWD} ;\
+	zip -g -r ./dist/bexh-api-aws-lambda.zip ./main/src/ ;\
+	}
 
 docker-up:
 	docker-compose up -d

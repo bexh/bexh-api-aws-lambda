@@ -3,6 +3,7 @@ from main.src.core import Core
 
 
 def handler(event, context):
+    print("Starting...")
     core = Core()
     return core.run(event, context).serialize()
 
