@@ -12,7 +12,7 @@ install:
 
 clean:
 	rm -rf venv
-	rm -rf bexh-api-aws-lambda.zip
+	rm -rf ./dist/bexh-api-aws-lambda.zip
 
 build:
 	{ \
