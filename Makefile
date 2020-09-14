@@ -25,7 +25,7 @@ build:
 	cd venv/lib/python3.8/site-packages ;\
 	zip -r9 $${OLDPWD}/dist/bexh-api-aws-lambda.zip . ;\
 	cd $${OLDPWD} ;\
-	zip -g -r ./dist/bexh-api-aws-lambda.zip ./main/src/ ;\
+	zip -g -r ./dist/bexh-api-aws-lambda.zip ./main/ ;\
 	}
 
 docker-up:
