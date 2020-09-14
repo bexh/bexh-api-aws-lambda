@@ -36,3 +36,15 @@ docker-down:
 
 local-setup:
 	python scripts/local_setup.py
+
+help:
+	{ \
+	echo 'Commands:' ;\
+    echo '    clean          Cleans venv and package from old builds' ;\
+    echo '    build          Bundle package for deployment' ;\
+    echo '    install        Installs pipfile libraries' ;\
+    echo '    install-dev    Installs pipfile libraries for development purposes' ;\
+    echo '    docker-up      Spins up localstack and mysql containers for local development' ;\
+    echo '    docker-down    Spins down containers for local development' ;\
+    echo '    local-setup    Creates a mysql instance and creates tables' ;\
+	}
