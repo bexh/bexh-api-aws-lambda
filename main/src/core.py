@@ -1,4 +1,3 @@
-import logging
 from main.src.controllers import *
 from main.src.utils import Request, Response
 import sys
@@ -33,5 +32,5 @@ class Core:
             self.logger.info(f"Response: {response}")
             return response
         except Exception as e:
-            self.logger.error("Failed API request", stack_info=True)
+            self.logger.error(f"Failed API request: {e}", stack_info=True)
             return Response(body={"error": "Internal Server Error"}, status_code=500)

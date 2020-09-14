@@ -27,3 +27,12 @@ awslocal dynamodb put-item \
 """
 print(cmd)
 print(subprocess.getoutput(cmd))
+
+cmd = """
+awslocal secretsmanager create-secret \
+    --name db-creds \
+    --description "Local db creds" \
+    --secret-string file://scripts/db-creds.json
+"""
+print(cmd)
+print(subprocess.getoutput(cmd))

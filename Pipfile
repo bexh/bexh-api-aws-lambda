@@ -5,8 +5,6 @@ verify_ssl = true
 
 [dev-packages]
 awscli-local="*"
-# aws-sam-cli="*"
-# pipenv-setup="*"
 
 [packages]
 boto3="*"

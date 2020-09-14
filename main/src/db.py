@@ -1,8 +1,10 @@
 import boto3
 from botocore.exceptions import ClientError
 import pymysql
+import os
+import json
 
-from main.src.utils import Request, Response
+from main.src.utils import Request, Response, get_secret
 
 
 def login_required(f):
@@ -26,8 +28,8 @@ def login_required(f):
 
 
 class DynamoDb:
-    # TODO: dependency injection on local vs aws
-    db = boto3.resource('dynamodb', endpoint_url="http://localhost:4566")
+    def __init__(self):
+        self.db = boto3.resource('dynamodb', endpoint_url=os.environ.get("ENDPOINT_URL", None))
 
     def check_token(self, user: str, token: str) -> bool:
         """
@@ -51,11 +53,11 @@ class DynamoDb:
 
 class MySql:
     def __init__(self):
-        # TODO: dependency injection and best practice w credentials
-        self.host = "127.0.0.1"
-        self.user = "user"
-        self.password = "password"
-        self.db = "db"
+        self.host = os.environ.get('MYSQL_HOST_URL')
+        self.db = os.environ.get('MYSQL_DATABASE_NAME')
+        creds = json.loads(get_secret("db-creds"))
+        self.user = creds['username']
+        self.password = creds['password']
 
     def __connect__(self):
         self.con = pymysql.connect(
