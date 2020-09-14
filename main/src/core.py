@@ -1,6 +1,7 @@
 import logging
 from main.src.controllers import *
 from main.src.utils import Request, Response
+import sys
 
 
 class Core:
@@ -8,7 +9,14 @@ class Core:
     def __init__(self):
         self.flask = FlaskLite()
         self.app = self.flask.app
-        self.logger = logging.Logger(name="bexh-api-aws-lambda")
+        self.logger = logging.getLogger()
+        self.logger.setLevel(logging.INFO)
+
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setLevel(logging.DEBUG)
+        formatter = logging.Formatter('[%(levelname)s] created=%(asctime)s message=%(message)s')
+        handler.setFormatter(formatter)
+        self.logger.addHandler(handler)
 
     def run(self, event, context) -> Response:
         try:
