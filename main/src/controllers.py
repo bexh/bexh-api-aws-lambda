@@ -1,7 +1,7 @@
 from main.src.flask_lite import FlaskLite
 from main.src.utils import Response, Request
 from main.src.db import login_required, MySql
-import logging
+from main.src.logger import LoggerFactory
 
 flask = FlaskLite()
 app = flask.app
@@ -9,7 +9,7 @@ app = flask.app
 
 @app.route("/test2", methods=["PUT"])
 def test_2(request: Request):
-    logger = logging.getLogger()
+    logger = LoggerFactory().get_logger(__name__)
     logger.info("another info message")
     return Response(body={"foo": "bar"}, status_code=204)
 
@@ -17,7 +17,7 @@ def test_2(request: Request):
 @app.route("/bexh", methods=["POST"])
 @login_required
 def bexh(request: Request):
-    logger = logging.getLogger()
+    logger = LoggerFactory().get_logger(__name__)
     logger.info("info message")
     logger.warning("warning message")
     logger.error("error message")
