@@ -18,4 +18,12 @@ jobs:
       - name: Run Tests
         run: |
           make test
-
+      - name: Create Build Artifact
+        run: |
+          make clean
+          make build
+      - uses: actions/upload-artifact@v2
+      - name: Upload Build Artifact
+        with:
+          name: bexh-api-aws-lambda-artifact
+          path: dist/bexh-api-aws-lambda.zip
