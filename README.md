@@ -70,6 +70,7 @@ Make Targets:
 Commands:
     clean          Cleans venv and package from old builds
     build          Bundle package for deployment
+    test           Runs all test cases
     install        Installs pipfile libraries
     install-dev    Installs pipfile libraries for development purposes
     docker-up      Spins up localstack and mysql containers for local development

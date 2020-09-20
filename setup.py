@@ -6,7 +6,7 @@ setup(
     packages=[
         'main.src'
     ],
-    scripts=['bin/script1', 'bin/script2'],
+    scripts=[],
     url='http://pypi.python.org/pypi/PackageName/',
     description='An awesome package that does something',
     long_description=open('README.md').read(),
