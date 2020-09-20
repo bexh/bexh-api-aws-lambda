@@ -14,7 +14,7 @@ jobs:
       - name: Set up VirtualEnv
         run: |
           pip3 install pipenv
-          pipenv shell --python 3.8
+          pipenv --python 3.8
       - name: Install Dependencies
         run: |
           make install-dev
