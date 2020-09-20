@@ -11,11 +11,7 @@ jobs:
         uses: actions/setup-python@v2
         with:
           python-version: 3.8
-      - name: Set up VirtualEnv
-        run: |
-          pip3 install pipenv
-          pipenv --python 3.8
-      - name: Install Dependencies
+      - name: Set Up VirtualEnv
         run: |
           make install-dev
       - name: Run Tests
