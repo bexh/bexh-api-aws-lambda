@@ -22,8 +22,8 @@ jobs:
         run: |
           make clean
           make build
-      - uses: actions/upload-artifact@v2
       - name: Upload Build Artifact
+        uses: actions/upload-artifact@v2
         with:
           name: bexh-api-aws-lambda-artifact
           path: dist/bexh-api-aws-lambda.zip
