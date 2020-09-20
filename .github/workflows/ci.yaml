@@ -22,16 +22,3 @@ jobs:
         run: |
           make clean
           make build
-      - name: Upload Build Artifact
-        uses: actions/upload-artifact@v2
-        with:
-          name: bexh-api-aws-lambda-artifact
-          path: dist/bexh-api-aws-lambda.zip
-      - name: Upload Dist to S3
-        uses: jakejarvis/s3-sync-action@master
-        env:
-          AWS_S3_BUCKET: ${{ secrets.AWS_LAMBDA_DEPLOY_BUCKET_NAME }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: "us-east-1"
-          SOURCE_DIR: "dist"
