@@ -38,7 +38,7 @@ local-setup:
 	python scripts/local_setup.py
 
 test:
-	pytest -q main/test/sample_tests.py
+	pipenv run pytest -q main/test/sample_tests.py
 
 help:
 	{ \
