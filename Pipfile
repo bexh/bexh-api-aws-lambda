@@ -5,6 +5,7 @@ verify_ssl = true
 
 [dev-packages]
 awscli-local="*"
+pytest="*"
 
 [packages]
 boto3="*"

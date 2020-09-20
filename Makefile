@@ -37,11 +37,15 @@ docker-down:
 local-setup:
 	python scripts/local_setup.py
 
+test:
+	pytest -q main/test/sample_tests.py
+
 help:
 	{ \
 	echo 'Commands:' ;\
     echo '    clean          Cleans venv and package from old builds' ;\
     echo '    build          Bundle package for deployment' ;\
+    echo '    test           Runs all test cases' ;\
     echo '    install        Installs pipfile libraries' ;\
     echo '    install-dev    Installs pipfile libraries for development purposes' ;\
     echo '    docker-up      Spins up localstack and mysql containers for local development' ;\
