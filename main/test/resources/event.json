@@ -1,0 +1,69 @@
+{
+  "resource": "/bexh",
+  "path": "/bexh",
+  "httpMethod": "POST",
+  "headers": {
+    "foo": "bar",
+    "Content-Type": "application/json",
+    "user": "seth",
+    "token": "foo"
+  },
+  "multiValueHeaders": {
+    "foo": [
+      "bar"
+    ],
+    "Content-Type": [
+      "application/json"
+    ]
+  },
+  "queryStringParameters": {
+    "param1": "val",
+    "param2": "val2"
+  },
+  "multiValueQueryStringParameters": {
+    "param1": [
+      "val"
+    ],
+    "param2": [
+      "val2"
+    ]
+  },
+  "pathParameters": null,
+  "stageVariables": null,
+  "requestContext": {
+    "resourceId": "kjbj8d",
+    "resourcePath": "/bexh",
+    "httpMethod": "POST",
+    "extendedRequestId": "Sd3gXHD9oAMFtKQ=",
+    "requestTime": "06/Sep/2020:23:10:32 +0000",
+    "path": "/bexh",
+    "accountId": "189266647936",
+    "protocol": "HTTP/1.1",
+    "stage": "test-invoke-stage",
+    "domainPrefix": "testPrefix",
+    "requestTimeEpoch": 1599433832663,
+    "requestId": "43c9a955-86f9-4242-a706-068e826e2d36",
+    "identity": {
+      "cognitoIdentityPoolId": null,
+      "cognitoIdentityId": null,
+      "apiKey": "test-invoke-api-key",
+      "principalOrgId": null,
+      "cognitoAuthenticationType": null,
+      "userArn": "arn:aws:iam::189266647936:root",
+      "apiKeyId": "test-invoke-api-key-id",
+      "userAgent": "aws-internal/3 aws-sdk-java/1.11.848 Linux/4.9.217-0.1.ac.205.84.332.metal1.x86_64 OpenJDK_64-Bit_Server_VM/25.262-b10 java/1.8.0_262 vendor/Oracle_Corporation",
+      "accountId": "189266647936",
+      "caller": "189266647936",
+      "sourceIp": "test-invoke-source-ip",
+      "accessKey": "ASIASYEJL3OAB63DDL4P",
+      "cognitoAuthenticationProvider": null,
+      "user": "189266647936"
+    },
+    "domainName": "testPrefix.testDomainName",
+    "apiId": "3byu5ncuog"
+  },
+  "body": {
+    "foo": "bar"
+  },
+  "isBase64Encoded": false
+}

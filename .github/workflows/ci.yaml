@@ -1,0 +1,24 @@
+name: bexh-api-aws-lambda CI
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python 3.8
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.8
+      - name: Set Up VirtualEnv
+        run: |
+          pip3 install pipenv
+          make install-dev
+      - name: Run Tests
+        run: |
+          make test
+      - name: Create Build Artifact
+        run: |
+          make clean
+          make build
