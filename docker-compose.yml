@@ -8,7 +8,7 @@ services:
       - "4566-4599:4566-4599"
       - "${PORT_WEB_UI-8080}:${PORT_WEB_UI-8080}"
     environment:
-      - SERVICES=dynamodb,s3,secretsmanager
+      - SERVICES=dynamodb,s3,secretsmanager,es
       - HOSTNAME=localstack
       - DEFAULT_REGION=us-east-1
       - PORT_WEB_UI=${PORT_WEB_UI- }
@@ -34,6 +34,24 @@ services:
       # Where our data will be persisted
     volumes:
       - my-db:/var/lib/mysql
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:6.3.2
+    environment:
+      - cluster.name=docker-cluster
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      - "9200:9200"
+  kibana:
+    image: docker.elastic.co/kibana/kibana:6.3.2
+    ports:
+      - "5601:5601"
+
 # Names our volume
 volumes:
   my-db:
