@@ -51,7 +51,7 @@ class Logger:
         self._logger.warning(msg=msg, extra=self._extras)
 
     def error(self, msg: str, **kwargs):
-        self._logger.error(msg=msg, stack_info=True, exc_info=True, extra=self._extras)
+        self._logger.error(msg=msg, exc_info=True, extra=self._extras)
 
     def critical(self, msg: str, **kwargs):
-        self._logger.critical(msg=msg, stack_info=True, exc_info=True, extra=self._extras)
+        self._logger.critical(msg=msg, exc_info=True, extra=self._extras)

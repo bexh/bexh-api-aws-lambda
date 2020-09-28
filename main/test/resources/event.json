@@ -1,7 +1,7 @@
 {
-  "resource": "/bexh",
-  "path": "/bexh",
-  "httpMethod": "POST",
+  "resource": "/event/sport",
+  "path": "/event/sport",
+  "httpMethod": "GET",
   "headers": {
     "foo": "bar",
     "Content-Type": "application/json",
@@ -33,7 +33,7 @@
   "requestContext": {
     "resourceId": "kjbj8d",
     "resourcePath": "/bexh",
-    "httpMethod": "POST",
+    "httpMethod": "GET",
     "extendedRequestId": "Sd3gXHD9oAMFtKQ=",
     "requestTime": "06/Sep/2020:23:10:32 +0000",
     "path": "/bexh",
@@ -63,7 +63,9 @@
     "apiId": "3byu5ncuog"
   },
   "body": {
-    "foo": "bar"
+    "sport": "basketball",
+    "page": 1,
+    "page_size": 5
   },
   "isBase64Encoded": false
 }

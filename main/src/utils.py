@@ -5,6 +5,8 @@ import boto3
 import base64
 from botocore.exceptions import ClientError
 import os
+from decimal import Decimal
+from datetime import datetime
 
 
 class Request:
@@ -110,3 +112,30 @@ def get_secret(secret_name: str):
         else:
             decoded_binary_secret = base64.b64decode(get_secret_value_response['SecretBinary'])
             return decoded_binary_secret
+
+
+def dec_to_float(decimal, precision: int = 2) -> float:
+    if type(decimal) != Decimal:
+        return decimal
+    return float(round(decimal, precision))
+
+
+def first(df):
+    first_entry = next(iter(df), None)
+    return {} if type(first_entry) != dict else first_entry
+
+
+def datetime_to_display_format(dt) -> str:
+    def suffix(d):
+        return 'th' if 11 <= d <= 13 else {1: 'st', 2: 'nd', 3: 'rd'}.get(d % 10, 'th')
+
+    def custom_strftime(format, t):
+        return t.strftime(format).replace('{S}', str(t.day) + suffix(t.day))
+
+    return custom_strftime("%A, %B {S}, %I:%M %p", dt)
+
+
+def iso_format(dt: datetime) -> str:
+    return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
