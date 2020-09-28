@@ -29,7 +29,7 @@ class Core:
                 self.logger.info(f"Response: {response}")
                 return response
             except Exception as e:
-                self.logger.error(f"Failed API request: {e}", stack_info=True)
+                self.logger.error(f"Failed API request: {e}")
                 return Response(body={"error": "Internal Server Error"}, status_code=500)
 
         start_time = datetime.now(timezone.utc)

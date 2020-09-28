@@ -5,7 +5,8 @@ from main.src.core import Core
 def handler(event, context):
     print("Starting...")
     core = Core()
-    return core.run(event, context).serialize()
+    result = core.run(event, context).serialize()
+    return result
 
 
 if __name__ == "__main__":
