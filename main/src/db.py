@@ -84,3 +84,14 @@ class MySql:
         self.cur.execute(sql)
         self.con.commit()
         self.__disconnect__()
+
+    def multi_execute(self, sql: [str]):
+        self.__connect__()
+        statements = sql.split(";")[:-1]
+        results = []
+        for statement in statements:
+            self.cur.execute(statement)
+            self.con.commit()
+            results.append(self.cur.fetchall())
+        self.__disconnect__()
+        return results

@@ -139,3 +139,9 @@ def iso_format(dt: datetime) -> str:
     return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def transform_event_dtm_to_date(event: dict) -> dict:
+    date = iso_format(event['dtm'])
+    event['date'] = date
+    del event['dtm']
+    return event
+

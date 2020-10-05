@@ -1,7 +1,7 @@
 {
-  "resource": "/event/sport",
-  "path": "/event/sport",
-  "httpMethod": "GET",
+  "resource": "/event/makeBet/market",
+  "path": "/event/makeBet/market",
+  "httpMethod": "POST",
   "headers": {
     "foo": "bar",
     "Content-Type": "application/json",
@@ -63,9 +63,10 @@
     "apiId": "3byu5ncuog"
   },
   "body": {
-    "sport": "basketball",
-    "page": 1,
-    "page_size": 5
+    "eventId": 1,
+    "uid": 1,
+    "on": "Team 1",
+    "amount": 1.00
   },
   "isBase64Encoded": false
 }

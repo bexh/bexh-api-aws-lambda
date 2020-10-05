@@ -34,5 +34,19 @@ awslocal secretsmanager create-secret \
     --description "Local db creds" \
     --secret-string file://scripts/db-creds.json
 """
-print(cmd)
-print(subprocess.getoutput(cmd))
+try:
+    print(cmd)
+    print(subprocess.getoutput(cmd))
+except Exception as e:
+    print("secret already exists", e)
+
+cmd = """
+awslocal kinesis create-stream \
+    --stream-name make-bet \
+    --shard-count 1
+"""
+try:
+    print(cmd)
+    print(subprocess.getoutput(cmd))
+except Exception as e:
+    print("stream already exists", e)
