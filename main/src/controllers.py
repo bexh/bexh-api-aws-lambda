@@ -216,10 +216,19 @@ def event_bets(request: Request):
 
 @app.route("/event/makeBet/market", methods=["POST"])
 def event_make_bet_market(request: Request):
+    """
+    1. update/check user balance
+    2. submit bet and get bet id
+    3. submit bet to kinesis
+    """
     event_id = request.body['eventId']
     uid = request.body['uid']
     on = request.body['on']
     amount = request.body['amount']
+    market = "exchange"
+    bet_type = "market"
+    status = "pending"
+
     db = MySql()
 
     try:
@@ -240,17 +249,15 @@ def event_make_bet_market(request: Request):
         WHERE EVENT_ID = '%s';
     """ % event_id))['odds']
 
-    est_profit = round((amount*odds/100), 2) if odds > 0 else round((amount/odds/100), 2)
-
     bet_id = db.multi_execute("""
         INSERT INTO BETS(USER_ID, EVENT_ID, MARKET, ODDS, AMOUNT, EST_PROFIT, ON_TEAM, TYPE, STATUS, FRIEND, DTM, WON)
         VALUES
             (%s, %s, '%s', %s, %s, %s, '%s', '%s', '%s', NULL, now(), NULL);
         SELECT last_insert_id();
-    """ % (uid, event_id, "exchange", odds, amount, est_profit, on, 'market', 'pending'))[1][0]["last_insert_id()"]
+    """ % (uid, event_id, market, odds, amount, 0, on, bet_type, status))[1][0]["last_insert_id()"]
 
-    payload = {**request.body, "bet_id": bet_id}
-    stream_name = os.environ.get('MAKE_BET_KINESIS_STREAM_NAME')
+    payload = {**request.body, "bet_id": bet_id, "type": bet_type}
+    stream_name = os.environ.get('MAKE_EXCHANGE_BET_KINESIS_STREAM_NAME')
 
     try:
         client = boto3.client('kinesis', endpoint_url=os.environ.get("ENDPOINT_URL", None))
@@ -259,6 +266,146 @@ def event_make_bet_market(request: Request):
             Data=dumps(payload),
             PartitionKey=str(uid)
         )
+        return Response(status_code=204)
+    except Exception as e:
+        # rollback
+        db.execute("""
+            UPDATE USERS
+            SET BALANCE = BALANCE + %s
+            WHERE USER_ID = %s;
+        """ % amount)
+        db.execute("""
+            DELETE FROM BETS
+            WHERE BET_ID = %s
+        """ % bet_id)
+        return Response(body={"error": f"could not write to kinesis {e}"}, status_code=500)
+
+
+@app.route("/event/makeBet/limit", methods=["POST"])
+def event_make_bet_market(request: Request):
+    """
+    1. update/check user balance
+    2. submit bet and get bet id
+    3. submit bet to kinesis
+    """
+    event_id = request.body['eventId']
+    uid = request.body['uid']
+    on = request.body['on']
+    amount = request.body['amount']
+    odds = request.body['odds']
+    market = "exchange"
+    bet_type = "limit"
+    status = "pending"
+
+    db = MySql()
+
+    try:
+        db.execute("""
+            UPDATE USERS
+            SET BALANCE = BALANCE - %s
+            WHERE USER_ID = %s;
+        """ % (amount, uid))
+    except OperationalError as e:
+        error_code, error_message = e.args
+        if error_code == 3819:
+            return Response(body={"error": "insufficient funds"}, status_code=502)
+        else:
+            raise e
+
+    bet_id = db.multi_execute("""
+        INSERT INTO BETS(USER_ID, EVENT_ID, MARKET, ODDS, AMOUNT, EST_PROFIT, ON_TEAM, TYPE, STATUS, FRIEND, DTM, WON)
+        VALUES
+            (%s, %s, '%s', %s, %s, %s, '%s', '%s', '%s', NULL, now(), NULL);
+        SELECT last_insert_id();
+    """ % (uid, event_id, market, odds, amount, 0, on, bet_type, status))[1][0]["last_insert_id()"]
+
+    payload = {**request.body, "bet_id": bet_id, "type": bet_type}
+    stream_name = os.environ.get('MAKE_EXCHANGE_BET_KINESIS_STREAM_NAME')
+
+    try:
+        client = boto3.client('kinesis', endpoint_url=os.environ.get("ENDPOINT_URL", None))
+        client.put_record(
+            StreamName=stream_name,
+            Data=dumps(payload),
+            PartitionKey=str(uid)
+        )
+        return Response(status_code=204)
+    except Exception as e:
+        # rollback
+        db.execute("""
+            UPDATE USERS
+            SET BALANCE = BALANCE + %s
+            WHERE USER_ID = %s;
+        """ % amount)
+        db.execute("""
+            DELETE FROM BETS
+            WHERE BET_ID = %s
+        """ % bet_id)
+        return Response(body={"error": f"could not write to kinesis {e}"}, status_code=500)
+
+
+@app.route("/event/makeBet/friend", methods=["POST"])
+def event_make_bet_friend(request: Request):
+    """
+    1. subtract/check user balance
+    2. submit bet and get bet id
+    3. send to sns
+    """
+    event_id = request.body['eventId']
+    uid = request.body['uid']
+    on = request.body['on']
+    amount = request.body['amount']
+    odds = request.body['odds']
+    friend_id = request.body['friendId']
+    market = "social"
+    status = "pending friend"
+
+    db = MySql()
+
+    try:
+        db.execute("""
+            UPDATE USERS
+            SET BALANCE = BALANCE - %s
+            WHERE USER_ID = %s;
+        """ % (amount, uid))
+    except OperationalError as e:
+        error_code, error_message = e.args
+        if error_code == 3819:
+            return Response(body={"error": "insufficient funds"}, status_code=502)
+        else:
+            raise e
+
+    try:
+        bet_id = db.multi_execute("""
+            INSERT INTO BETS(USER_ID, EVENT_ID, MARKET, ODDS, AMOUNT, EST_PROFIT, ON_TEAM, TYPE, STATUS, FRIEND, DTM, WON)
+            VALUES
+                (%s, %s, '%s', %s, %s, %s, '%s', NULL, '%s', '%s', now(), NULL);
+            SELECT last_insert_id();
+        """ % (uid, event_id, market, odds, amount, 0, on, status, friend_id))[1][0]["last_insert_id()"]
+    except OperationalError as e:
+        error_code, error_message = e.args
+        # rollback
+        db.execute("""
+            UPDATE USERS
+            SET BALANCE = BALANCE + %s
+            WHERE USER_ID = %s;
+        """ % (amount, uid))
+        if error_code == 1452:
+            return Response(body={"error": "friend does not exist"}, status_code=500)
+        else:
+            raise e
+
+    payload = {**request.body, "bet_id": bet_id}
+    stream_name = os.environ.get('MAKE_SOCIAL_BET_KINESIS_STREAM_NAME')
+
+    try:
+        client = boto3.client('kinesis', endpoint_url=os.environ.get("ENDPOINT_URL", None))
+        client.put_record(
+            StreamName=stream_name,
+            Data=dumps(payload),
+            PartitionKey=str(uid)
+        )
+        return Response(status_code=204)
     except Exception as e:
         # rollback
         db.execute("""

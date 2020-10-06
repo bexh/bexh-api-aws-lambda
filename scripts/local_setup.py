@@ -42,7 +42,18 @@ except Exception as e:
 
 cmd = """
 awslocal kinesis create-stream \
-    --stream-name make-bet \
+    --stream-name make-exchange-bet \
+    --shard-count 1
+"""
+try:
+    print(cmd)
+    print(subprocess.getoutput(cmd))
+except Exception as e:
+    print("stream already exists", e)
+
+cmd = """
+awslocal kinesis create-stream \
+    --stream-name make-social-bet \
     --shard-count 1
 """
 try:

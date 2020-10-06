@@ -1,6 +1,6 @@
 {
-  "resource": "/event/makeBet/market",
-  "path": "/event/makeBet/market",
+  "resource": "/event/makeBet/friend",
+  "path": "/event/makeBet/friend",
   "httpMethod": "POST",
   "headers": {
     "foo": "bar",
@@ -66,7 +66,9 @@
     "eventId": 1,
     "uid": 1,
     "on": "Team 1",
-    "amount": 1.00
+    "amount": 1.00,
+    "odds": 100,
+    "friendId": 2
   },
   "isBase64Encoded": false
 }
