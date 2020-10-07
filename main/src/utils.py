@@ -19,7 +19,7 @@ class Request:
 
 
 class Response:
-    def __init__(self, body: dict, status_code: int):
+    def __init__(self, status_code: int, body: dict = {}):
         self.body = body
         self.status_code = status_code
 
@@ -138,4 +138,10 @@ def datetime_to_display_format(dt) -> str:
 def iso_format(dt: datetime) -> str:
     return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
+
+def transform_event_dtm_to_date(event: dict) -> dict:
+    date = iso_format(event['dtm'])
+    event['date'] = date
+    del event['dtm']
+    return event
 
