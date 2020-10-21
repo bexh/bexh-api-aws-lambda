@@ -5,7 +5,7 @@
   "headers": {
     "foo": "bar",
     "Content-Type": "application/json",
-    "user": "seth",
+    "uid": 1,
     "token": "foo"
   },
   "multiValueHeaders": {
@@ -63,11 +63,11 @@
     "apiId": "3byu5ncuog"
   },
   "body": {
-    "eventId": 1,
+    "eventId": "1",
     "uid": 1,
     "on": "Team 1",
-    "amount": 1.00,
-    "odds": 100,
+    "amount": 10,
+    "odds": 200,
     "friendId": 2
   },
   "isBase64Encoded": false

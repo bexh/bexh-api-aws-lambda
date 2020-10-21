@@ -12,6 +12,7 @@ setup(
     long_description=open('README.md').read(),
     install_requires=[
         "boto3",
-        "pymysql"
+        "pymysql",
+        "validate_email"
     ],
 )

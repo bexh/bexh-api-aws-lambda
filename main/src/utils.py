@@ -7,6 +7,8 @@ from botocore.exceptions import ClientError
 import os
 from decimal import Decimal
 from datetime import datetime
+from hashlib import sha256
+from uuid import uuid4
 
 
 class Request:
@@ -145,3 +147,12 @@ def transform_event_dtm_to_date(event: dict) -> dict:
     del event['dtm']
     return event
 
+
+def encrypt(email: str, password: str) -> str:
+    salted = password + email
+    hashed = sha256(salted.encode('utf-8')).hexdigest()
+    return hashed
+
+
+def generate_token() -> str:
+    return str(uuid4())

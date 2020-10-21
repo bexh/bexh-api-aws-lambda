@@ -18,19 +18,19 @@ CREATE TABLE IF NOT EXISTS USERS (
 	MONTH_OF_BIRTH INTEGER,
 	DAY_OF_BIRTH INTEGER,
 	SSN INTEGER,
-	EMAIL VARCHAR(100),
+	EMAIL VARCHAR(100) NOT NULL,
 	PHONE INTEGER,
-	PWD VARCHAR(100),
+	PWD VARCHAR(100) NOT NULL,
 	ADDRESS VARCHAR(500),
 	PRIMARY KEY(USER_ID),
 	CHECK(BALANCE >= 0.00)
 ) ENGINE=InnoDb;
 
-INSERT INTO USERS(USER_ID, FIRST_NAME, LAST_NAME, BALANCE)
+INSERT INTO USERS(USER_ID, FIRST_NAME, LAST_NAME, BALANCE, EMAIL, PWD)
 VALUES
-    (1, "seth", "saperstein", 100.00),
-    (2, "eris", "llangos", 100.00),
-    (3, "julia", "rosenson", 100.00);
+    (1, "seth", "saperstein", 100.00, "seth@gmail.com", "password"),
+    (2, "eris", "llangos", 100.00, "eris@gmail.com", "password"),
+    (3, "julia", "rosenson", 100.00, "julia@gmail.com", "password");
 
 CREATE TABLE IF NOT EXISTS FRIENDS (
 	USER1_ID INTEGER,

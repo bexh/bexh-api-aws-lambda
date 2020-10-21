@@ -9,8 +9,8 @@ print(subprocess.getoutput(cmd))
 cmd = """
 awslocal dynamodb create-table \
     --table-name Tokens \
-    --attribute-definitions AttributeName=User,AttributeType=S \
-    --key-schema AttributeName=User,KeyType=HASH \
+    --attribute-definitions AttributeName=Uid,AttributeType=N \
+    --key-schema AttributeName=Uid,KeyType=HASH \
     --provisioned-throughput ReadCapacityUnits=1,WriteCapacityUnits=1
 """
 try:
@@ -18,6 +18,18 @@ try:
     print(subprocess.getoutput(cmd))
 except Exception as e:
     print("table already exists", e)
+
+
+cmd = """
+awslocal dynamodb update-time-to-live \
+    --table-name Tokens \
+    --time-to-live-specification Enabled=true,AttributeName=TimeToLive
+"""
+try:
+    print(cmd)
+    print(subprocess.getoutput(cmd))
+except Exception as e:
+    print("error with ttl", e)
 
 
 cmd = """

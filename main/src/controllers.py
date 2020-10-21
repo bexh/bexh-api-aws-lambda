@@ -1,9 +1,10 @@
 from main.src.flask_lite import FlaskLite
-from main.src.utils import Response, Request, dec_to_float, first, iso_format, transform_event_dtm_to_date
-from main.src.db import login_required, MySql
+from main.src.utils import Response, Request, dec_to_float, first, iso_format, transform_event_dtm_to_date, encrypt, generate_token
+from main.src.db import login_required, MySql, DynamoDb
 from main.src.logger import LoggerFactory
 
 from pymysql import OperationalError
+from validate_email import validate_email
 import boto3
 import os
 from json import dumps
@@ -14,6 +15,7 @@ app = flask.app
 
 
 @app.route("/portfolio/overview", methods=["GET"])
+@login_required
 def portfolio_overview(request: Request):
     # logger = LoggerFactory().get_logger(__name__)
     uid = request.body['uid']
@@ -46,6 +48,7 @@ def portfolio_overview(request: Request):
 
 
 @app.route("/portfolio/bets", methods=["GET"])
+@login_required
 def portfolio_bets(request: Request):
     uid = request.body['uid']
     status = request.body['status']
@@ -90,6 +93,7 @@ def portfolio_bets(request: Request):
 
 
 @app.route("/portfolio/recommended", methods=["GET"])
+@login_required
 def portfolio_recommended(request: Request):
     uid = request.body['uid']
     page = request.body['page']
@@ -168,6 +172,7 @@ def event_odds(request: Request):
 
 
 @app.route("/event/bets", methods=["GET"])
+@login_required
 def event_bets(request: Request):
     event_id = request.body['eventId']
     uid = request.body['uid']
@@ -215,6 +220,7 @@ def event_bets(request: Request):
 
 
 @app.route("/event/makeBet/market", methods=["POST"])
+@login_required
 def event_make_bet_market(request: Request):
     """
     1. update/check user balance
@@ -282,6 +288,7 @@ def event_make_bet_market(request: Request):
 
 
 @app.route("/event/makeBet/limit", methods=["POST"])
+@login_required
 def event_make_bet_market(request: Request):
     """
     1. update/check user balance
@@ -345,11 +352,12 @@ def event_make_bet_market(request: Request):
 
 
 @app.route("/event/makeBet/friend", methods=["POST"])
+# @login_required
 def event_make_bet_friend(request: Request):
     """
     1. subtract/check user balance
     2. submit bet and get bet id
-    3. send to sns
+    3. send to kinesis
     """
     event_id = request.body['eventId']
     uid = request.body['uid']
@@ -394,6 +402,33 @@ def event_make_bet_friend(request: Request):
             return Response(body={"error": "friend does not exist"}, status_code=500)
         else:
             raise e
+    try:
+        friend_odds = odds * -1
+        friend_amount = (amount/100/friend_odds) if friend_odds > 0 else (amount/100*abs(friend_odds))
+        event_details = first(db.fetch("""
+            SELECT HOME AS homeTeam, AWAY AS awayTeam FROM EVENT
+            WHERE EVENT_ID = '%s'
+        """ % event_id))
+        home_team, away_team = event_details['homeTeam'], event_details['awayTeam']
+        friend_on = home_team if on == away_team else away_team
+        friend_status = "pending user"
+
+        friend_bet_id = db.multi_execute("""
+            INSERT INTO BETS(USER_ID, EVENT_ID, MARKET, ODDS, AMOUNT, EST_PROFIT, ON_TEAM, TYPE, STATUS, FRIEND, DTM, WON)
+            VALUES
+                (%s, %s, '%s', %s, %s, %s, '%s', NULL, '%s', '%s', now(), NULL);
+            SELECT last_insert_id();
+        """ % (friend_id, event_id, market, friend_odds, friend_amount, 0, friend_on, friend_status, uid))[1][0]["last_insert_id()"]
+    except Exception as e:
+        # rollback
+        db.multi_execute("""
+            UPDATE USERS
+            SET BALANCE = BALANCE + %s
+            WHERE USER_ID = %s;
+            DELETE FROM BETS
+            WHERE BET_ID = %s
+            OR BET_ID = %s;
+        """ % (amount, uid, bet_id, friend_bet_id))
 
     payload = {**request.body, "bet_id": bet_id}
     stream_name = os.environ.get('MAKE_SOCIAL_BET_KINESIS_STREAM_NAME')
@@ -418,3 +453,107 @@ def event_make_bet_friend(request: Request):
             WHERE BET_ID = %s
         """ % bet_id)
         return Response(body={"error": f"could not write to kinesis {e}"}, status_code=500)
+
+
+@app.route("/signup", methods=["POST"])
+def signup(request: Request):
+    email = request.body['email']
+    password = request.body['password']
+    first_name = request.body['firstName']
+    last_name = request.body['lastName']
+    db = MySql()
+
+    hashed_password = encrypt(password=password, email=email)
+
+    is_valid = validate_email(email)
+    if not is_valid:
+        return Response(body={"error": "invalid email format"}, status_code=403)
+    results = db.fetch("""
+        SELECT * FROM USERS
+        WHERE EMAIL = '%s'
+    """ % email)
+    results = first(results)
+    if results:
+        return Response(body={"error": "user already exists"}, status_code=409)
+
+    db.execute("""
+        INSERT INTO USERS(EMAIL, FIRST_NAME, LAST_NAME, PWD)
+        VALUES
+        ('%s', '%s', '%s', '%s');
+    """ % (email, first_name, last_name, hashed_password))
+
+    return Response(status_code=200)
+
+
+@app.route("/login", methods=["GET"])
+def login(request: Request):
+    email = request.body['email']
+    password = request.body['password']
+
+    hashed_password = encrypt(email=email, password=password)
+
+    db = MySql()
+    dynamo = DynamoDb()
+
+    result = first(db.fetch("""
+        SELECT USER_ID AS uid FROM USERS
+        WHERE EMAIL = '%s'
+        AND PWD = '%s'
+    """ % (email, hashed_password)))
+
+    if not result:
+        return Response(body={"error": "incorrect email or password"}, status_code=401)
+
+    uid = result['uid']
+    # token = generate_token()
+    # TODO: remove this and replace with above token
+    token = "foo"
+
+    dynamo.insert_token(uid=uid, token=token)
+
+    body = {'uid': uid, 'token': token}
+    return Response(body=body, status_code=200)
+
+
+@app.route("/bet/social/accept", methods=["PUT"])
+@login_required
+def bet_social_accept(request: Request):
+    uid = request.body['uid']
+    bet_id = request.body['betId']
+
+    db = MySql()
+
+    # TODO: come back to this as may have to rethink how friend bets are added to bets
+
+
+@app.route("/bet/social/cancel", methods=["PUT"])
+# @login_required
+def bet_social_cancel(request: Request):
+    uid = request.body['uid']
+    bet_id = request.body['betId']
+
+    db = MySql()
+
+    # TODO: come back after figuring out social bets
+
+
+@app.route("/bet/social/decline", methods=["PUT"])
+@login_required
+def bet_social_decline(request: Request):
+    uid = request.body['uid']
+    bet_id = request.body['betId']
+
+    db = MySql()
+
+    # TODO: come back after figuring out social bets
+
+
+@app.route("/bet/exchange/cancel", methods=["PUT"])
+# @login_required
+def bet_exchange_cancel(request: Request):
+    uid = request.body['uid']
+    bet_id = request.body['betId']
+
+    db = MySql()
+
+
