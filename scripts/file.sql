@@ -120,23 +120,24 @@ CREATE TABLE IF NOT EXISTS BETS (
 	EST_PROFIT DECIMAL (13,2) NOT NULL,
 	ON_TEAM VARCHAR(100) NOT NULL,
 	TYPE ENUM('market', 'limit'),
-	STATUS ENUM('pending', 'pending user', 'pending friend', 'active', 'completed') NOT NULL,
+	STATUS ENUM('pending', 'submitted', 'partially executed', 'executed', 'completed', 'pending cancel', 'cancelled', 'pending user', 'pending friend', 'active', 'declined') NOT NULL,
 	FRIEND INTEGER,
 	DTM DATETIME NOT NULL,
 	WON BOOLEAN,
+	PAIRED_BET_ID INTEGER REFERENCES BETS(BET_ID),
 	PRIMARY KEY(BET_ID),
 	FOREIGN KEY (EVENT_ID) REFERENCES EVENT(EVENT_ID),
 	FOREIGN KEY (FRIEND) REFERENCES USERS(USER_ID),
 	FOREIGN KEY (USER_ID) REFERENCES USERS(USER_ID)
 );
 
-INSERT INTO BETS(BET_ID, USER_ID, EVENT_ID, MARKET, ODDS, AMOUNT, EST_PROFIT, ON_TEAM, TYPE, STATUS, FRIEND, DTM, WON)
+INSERT INTO BETS(BET_ID, USER_ID, EVENT_ID, MARKET, ODDS, AMOUNT, EST_PROFIT, ON_TEAM, TYPE, STATUS, FRIEND, DTM, WON, PAIRED_BET_ID)
 VALUES
-    (1, 1, 1, 'exchange', 200, 20.00, 40.00, 'Team 1', 'market', 'active', NULL, '2020-10-01 10:00:00', NULL),
-    (2, 1, 1, 'social', 100, 10.00, 10.00, 'Team 1', NULL, 'active', 2, '2020-10-01 10:00:00', NULL),
-    (3, 2, 1, 'social', -100, 10.00, 10.00, 'Team 2', NULL, 'active', 1, '2020-10-01 10:00:00', NULL),
-    (4, 1, 1, 'social', -100, 40.00, 40.00, 'Team 2', NULL, 'pending friend', 3,'2020-10-01 10:00:00',  NULL),
-    (5, 3, 1, 'social', 100, 40.00, 40.00, 'Team 1', NULL, 'pending user', 1, '2020-10-01 10:00:00', NULL),
-    (6, 1, 3, 'exchange', 100, 10.00, 10.00, 'Team 5', 'market', 'completed', NULL, '2020-09-22 10:00:00', 1);
+    (1, 1, 1, 'exchange', 200, 20.00, 40.00, 'Team 1', 'market', 'executed', NULL, '2020-10-01 10:00:00', NULL, NULL),
+    (2, 1, 1, 'social', 100, 10.00, 10.00, 'Team 1', NULL, 'active', 2, '2020-10-01 10:00:00', NULL, 3),
+    (3, 2, 1, 'social', -100, 10.00, 10.00, 'Team 2', NULL, 'active', 1, '2020-10-01 10:00:00', NULL, 2),
+    (4, 1, 1, 'social', -100, 40.00, 40.00, 'Team 2', NULL, 'pending friend', 3,'2020-10-01 10:00:00',  NULL, 5),
+    (5, 3, 1, 'social', 100, 40.00, 40.00, 'Team 1', NULL, 'pending user', 1, '2020-10-01 10:00:00', NULL, 4),
+    (6, 1, 3, 'exchange', 100, 10.00, 10.00, 'Team 5', 'market', 'completed', NULL, '2020-09-22 10:00:00', 1, NULL);
 
 

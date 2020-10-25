@@ -1,5 +1,5 @@
 from main.src.flask_lite import FlaskLite
-from main.src.utils import Response, Request, dec_to_float, first, iso_format, transform_event_dtm_to_date, encrypt, generate_token
+from main.src.utils import Response, Request, dec_to_float, first, iso_format, transform_event_dtm_to_date, encrypt, generate_token, datetime_to_display_format
 from main.src.db import login_required, MySql, DynamoDb
 from main.src.logger import LoggerFactory
 
@@ -20,11 +20,12 @@ def portfolio_overview(request: Request):
     # logger = LoggerFactory().get_logger(__name__)
     uid = request.body['uid']
     db = MySql()
+    active_statuses = ", ".join(["'pending'", "'submitted'", "'partially executed'", "'executed'", "'active'"])
     in_play_to_win = db.fetch("""
         SELECT SUM(AMOUNT) AS inPlay, SUM(EST_PROFIT) AS toWin FROM BETS
         WHERE USER_ID = %s
-        AND (STATUS = 'active' OR STATUS = 'pending');
-    """ % uid)
+        AND STATUS IN (%s);
+    """ % uid, active_statuses)
 
     vig_savings = db.fetch("""
         SELECT SUM(AMOUNT + EST_PROFIT)*0.1 AS vigSavings FROM BETS
@@ -58,18 +59,29 @@ def portfolio_bets(request: Request):
     offset = page_size * (page - 1)
     db = MySql()
 
-    # TODO: fix query to get friend name not uid
+    pending_statuses = ", ".join(["'pending cancel'", "'pending friend'", "'pending user'"])
+    active_statuses = ", ".join(["'pending'", "'submitted'", "'partially executed'", "'executed'", "'active'"])
+    completed_statuses = ", ".join(["'completed'"])
+    status_lookup = {
+        "pending": pending_statuses,
+        "active": active_statuses,
+        "completed": completed_statuses
+    }
+    status = status_lookup[status]
+
     bets = db.fetch("""
         SELECT e.EVENT_ID AS eventId, e.DTM AS dtm, e.HOME AS homeTeam,
         e.AWAY AS awayTeam, b.ON_TEAM AS 'on', b.STATUS AS status,
-        b.AMOUNT as amount, b.FRIEND AS friend FROM EVENT e
+        b.AMOUNT as amount, u.FIRST_NAME as friendFirstName, u.LAST_NAME as friendLastName FROM EVENT e
         RIGHT JOIN
         (SELECT * FROM BETS
         WHERE USER_ID = %s
-        AND STATUS = '%s'
+        AND STATUS IN (%s)
         AND MARKET = '%s'
         ) AS b
         ON b.EVENT_ID = e.EVENT_ID
+        LEFT JOIN USERS u
+        ON b.FRIEND = u.USER_ID
         ORDER BY DTM DESC
         LIMIT %s
         OFFSET %s;
@@ -77,8 +89,10 @@ def portfolio_bets(request: Request):
 
     def transform_bets(bet):
         date = iso_format(bet['dtm'])
-        # TODO: temp hack for friend
-        friend = str(bet['friend'])
+
+        friend = f"{bet['friendFirstName']} {bet['friendLastName']}"
+        del bet['friendFirstName']
+        del bet['friendLastName']
 
         bet['date'] = date
         del bet['dtm']
@@ -263,7 +277,7 @@ def event_make_bet_market(request: Request):
     """ % (uid, event_id, market, odds, amount, 0, on, bet_type, status))[1][0]["last_insert_id()"]
 
     payload = {**request.body, "bet_id": bet_id, "type": bet_type}
-    stream_name = os.environ.get('MAKE_EXCHANGE_BET_KINESIS_STREAM_NAME')
+    stream_name = os.environ.get('EXCHANGE_BET_KINESIS_STREAM')
 
     try:
         client = boto3.client('kinesis', endpoint_url=os.environ.get("ENDPOINT_URL", None))
@@ -289,7 +303,7 @@ def event_make_bet_market(request: Request):
 
 @app.route("/event/makeBet/limit", methods=["POST"])
 @login_required
-def event_make_bet_market(request: Request):
+def event_make_bet_limit(request: Request):
     """
     1. update/check user balance
     2. submit bet and get bet id
@@ -327,7 +341,7 @@ def event_make_bet_market(request: Request):
     """ % (uid, event_id, market, odds, amount, 0, on, bet_type, status))[1][0]["last_insert_id()"]
 
     payload = {**request.body, "bet_id": bet_id, "type": bet_type}
-    stream_name = os.environ.get('MAKE_EXCHANGE_BET_KINESIS_STREAM_NAME')
+    stream_name = os.environ.get('EXCHANGE_BET_KINESIS_STREAM')
 
     try:
         client = boto3.client('kinesis', endpoint_url=os.environ.get("ENDPOINT_URL", None))
@@ -357,7 +371,7 @@ def event_make_bet_friend(request: Request):
     """
     1. subtract/check user balance
     2. submit bet and get bet id
-    3. send to kinesis
+    3. send to sns for email notification
     """
     event_id = request.body['eventId']
     uid = request.body['uid']
@@ -414,11 +428,17 @@ def event_make_bet_friend(request: Request):
         friend_status = "pending user"
 
         friend_bet_id = db.multi_execute("""
-            INSERT INTO BETS(USER_ID, EVENT_ID, MARKET, ODDS, AMOUNT, EST_PROFIT, ON_TEAM, TYPE, STATUS, FRIEND, DTM, WON)
+            INSERT INTO BETS(USER_ID, EVENT_ID, MARKET, ODDS, AMOUNT, EST_PROFIT, ON_TEAM, TYPE, STATUS, FRIEND, DTM, WON, PAIRED_BET_ID)
             VALUES
-                (%s, %s, '%s', %s, %s, %s, '%s', NULL, '%s', '%s', now(), NULL);
+                (%s, %s, '%s', %s, %s, %s, '%s', NULL, '%s', '%s', now(), NULL, %s);
             SELECT last_insert_id();
-        """ % (friend_id, event_id, market, friend_odds, friend_amount, 0, friend_on, friend_status, uid))[1][0]["last_insert_id()"]
+        """ % (friend_id, event_id, market, friend_odds, friend_amount, 0, friend_on, friend_status, uid, bet_id))[1][0]["last_insert_id()"]
+
+        db.execute("""
+            UPDATE BETS
+            SET PAIRED_BET_ID = %s
+            WHERE BET_ID = %s
+        """ % (friend_bet_id, bet_id))
     except Exception as e:
         # rollback
         db.multi_execute("""
@@ -429,30 +449,43 @@ def event_make_bet_friend(request: Request):
             WHERE BET_ID = %s
             OR BET_ID = %s;
         """ % (amount, uid, bet_id, friend_bet_id))
+        raise e
 
-    payload = {**request.body, "bet_id": bet_id}
-    stream_name = os.environ.get('MAKE_SOCIAL_BET_KINESIS_STREAM_NAME')
+    payload = first(db.fetch("""
+        SELECT u.EMAIL AS email, u.FIRST_NAME AS first_name, b.ON_TEAM AS 'on', e.HOME AS home,
+        e.AWAY AS away, e.DTM AS dtm, b.AMOUNT AS amount, f.FIRST_NAME AS friendFirstName, f.LAST_NAME AS friendLastName,
+        b.ODDS AS odds
+        FROM USERS u
+        LEFT JOIN BETS b
+        ON u.USER_ID = b.USER_ID
+        LEFT JOIN EVENT e
+        ON b.EVENT_ID = e.EVENT_ID
+        LEFT JOIN USERS f
+        ON f.USER_ID = b.FRIEND
+        WHERE u.USER_ID = %s
+        AND f.USER_ID = %s
+        AND b.BET_ID = %s
+        AND b.EVENT_ID = %s
+        AND e.EVENT_ID = %s;
+    """ % (uid, friend_id, bet_id, event_id, event_id)))
+    
+    if payload:
+        payload['date'] = datetime_to_display_format(payload['dtm'])
+        del payload['dtm']
+        
+        payload['with'] = f"{payload['friendFirstName']} {payload['friendLastName']}"
+        del payload['friendFirstName']
+        del payload['friendLastName']
 
-    try:
-        client = boto3.client('kinesis', endpoint_url=os.environ.get("ENDPOINT_URL", None))
-        client.put_record(
-            StreamName=stream_name,
-            Data=dumps(payload),
-            PartitionKey=str(uid)
+        topic_arn = os.environ.get('BET_STATUS_CHANGE_EMAIL_SNS_TOPIC_ARN')
+        client = boto3.client('sns', endpoint_url=os.environ.get("ENDPOINT_URL", None))
+        client.publish(
+            TargetArn=topic_arn,
+            Message=dumps(payload),
+            Subject="BET_SUBMITTED"
         )
-        return Response(status_code=204)
-    except Exception as e:
-        # rollback
-        db.execute("""
-            UPDATE USERS
-            SET BALANCE = BALANCE + %s
-            WHERE USER_ID = %s;
-        """ % amount)
-        db.execute("""
-            DELETE FROM BETS
-            WHERE BET_ID = %s
-        """ % bet_id)
-        return Response(body={"error": f"could not write to kinesis {e}"}, status_code=500)
+    
+    return Response(status_code=204)
 
 
 @app.route("/signup", methods=["POST"])
@@ -555,5 +588,25 @@ def bet_exchange_cancel(request: Request):
     bet_id = request.body['betId']
 
     db = MySql()
+
+    db.execute("""
+        UPDATE BETS
+        SET STATUS = '%s'
+        WHERE BET_ID = %s;
+    """ % ('pending cancel', bet_id))
+
+    payload = {
+        "action": "cancel",
+        "bet_id": bet_id
+    }
+
+    stream_name = os.environ.get('MAKE_EXCHANGE_BET_KINESIS_STREAM_NAME')
+
+    client = boto3.client('kinesis', endpoint_url=os.environ.get("ENDPOINT_URL", None))
+    client.put_record(
+        StreamName=stream_name,
+        Data=dumps(payload),
+        PartitionKey=str(uid)
+    )
 
 
