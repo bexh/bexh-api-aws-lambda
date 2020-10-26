@@ -4,3 +4,4 @@ venv/
 main/src/__pycache__/
 main/__pycache__/
 .idea/
+.env

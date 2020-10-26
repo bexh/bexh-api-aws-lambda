@@ -26,7 +26,7 @@ class Core:
                     self.logger.info(f"Response: {response.serialize()}")
                     return response
                 response = controller(request)
-                self.logger.info(f"Response: {response}")
+                self.logger.info(f"Response: {response.serialize()}")
                 return response
             except Exception as e:
                 self.logger.error(f"Failed API request: {e}")

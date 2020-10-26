@@ -10,6 +10,7 @@ pytest="*"
 [packages]
 boto3="*"
 pymysql="*"
+validate_email="*"
 
 [requires]
 python_version = "3.8"
