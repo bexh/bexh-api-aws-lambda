@@ -2,6 +2,7 @@ from main.src.flask_lite import FlaskLite
 from main.src.utils import Response, Request, dec_to_float, first, iso_format, transform_event_dtm_to_date, encrypt, generate_token, datetime_to_display_format
 from main.src.db import login_required, MySql, DynamoDb
 from main.src.logger import LoggerFactory
+from main.src.mailer import Mailer
 
 from pymysql import OperationalError
 from validate_email import validate_email
@@ -495,6 +496,7 @@ def signup(request: Request):
     first_name = request.body['firstName']
     last_name = request.body['lastName']
     db = MySql()
+    dynamo = DynamoDb()
 
     hashed_password = encrypt(password=password, email=email)
 
@@ -509,17 +511,78 @@ def signup(request: Request):
     if results:
         return Response(body={"error": "user already exists"}, status_code=409)
 
-    db.execute("""
+    uid = db.multi_execute("""
         INSERT INTO USERS(EMAIL, FIRST_NAME, LAST_NAME, PWD)
         VALUES
         ('%s', '%s', '%s', '%s');
-    """ % (email, first_name, last_name, hashed_password))
+        SELECT last_insert_id();
+    """ % (email, first_name, last_name, hashed_password))[1][0]["last_insert_id()"]
+
+    # token = generate_token()
+    # TODO: remove this and replace with above token
+    token = "foo"
+
+    dynamo.insert_token(uid=uid, token=token)
+    mailer = Mailer()
+    mailer.send_verification_email(
+        email=email,
+        first_name=first_name,
+        uid=uid,
+        token=token
+    )
 
     return Response(status_code=200)
 
 
+@app.route("/verify", methods=["PUT"])
+def verify(request: Request):
+    """
+    verify the user if the token is correct else resend the verification email with a new token
+    """
+    uid = request.query_str_params['uid']
+    token = request.query_str_params['token']
+    dynamo = DynamoDb()
+    db = MySql()
+
+    verified_session = dynamo.check_token(uid=uid, token=token)
+    if verified_session:
+        db.execute("""
+            UPDATE USERS
+            SET VERIFIED = 1
+            WHERE USER_ID = %s
+        """ % uid)
+        return Response(status_code=204)
+    else:
+        result = first(db.fetch("""
+            SELECT EMAIL AS email, FIRST_NAME AS first_name
+            FROM USERS
+            WHERE USER_ID = %s;
+        """ % uid))
+
+        # new_token = generate_token()
+        # TODO: remove this and replace with above token
+        new_token = "foo"
+
+        dynamo.insert_token(uid=uid, token=token)
+        mailer = Mailer()
+        mailer.send_verification_email(
+            email=result['email'],
+            first_name=result['first_name'],
+            uid=uid,
+            token=new_token
+        )
+
+        return Response(body={'error': 'expired verification token'}, status_code=401)
+
+
 @app.route("/login", methods=["GET"])
 def login(request: Request):
+    """
+    Check if email and pass word match
+    If not 401
+    If yes but not verified, create new token, resend verification, 401
+    Else create a new token and send it to the user
+    """
     email = request.body['email']
     password = request.body['password']
 
@@ -529,15 +592,33 @@ def login(request: Request):
     dynamo = DynamoDb()
 
     result = first(db.fetch("""
-        SELECT USER_ID AS uid FROM USERS
+        SELECT USER_ID AS uid, VERIFIED AS verified, FIRST_NAME AS first_name FROM USERS
         WHERE EMAIL = '%s'
         AND PWD = '%s'
     """ % (email, hashed_password)))
 
     if not result:
         return Response(body={"error": "incorrect email or password"}, status_code=401)
+    elif not result['verified']:
+        first_name = result['first_name']
+        uid = result['uid']
+
+        # token = generate_token()
+        # TODO: remove this and replace with above token
+        token = "foo"
+
+        dynamo.insert_token(token=token)
+        mailer = Mailer()
+        mailer.send_verification_email(
+            email=email,
+            first_name=first_name,
+            uid=uid,
+            token=token
+        )
+        return Response(body={"error": "user not verified"}, status_code=401)
 
     uid = result['uid']
+
     # token = generate_token()
     # TODO: remove this and replace with above token
     token = "foo"
@@ -551,34 +632,188 @@ def login(request: Request):
 @app.route("/bet/social/accept", methods=["PUT"])
 @login_required
 def bet_social_accept(request: Request):
+    """
+    Get details of bet and paired bet
+    Subtract amount from user
+    Update bet and paired bet with new status and estimated profit
+    Get details for email
+    Send Email
+    """
     uid = request.body['uid']
     bet_id = request.body['betId']
 
     db = MySql()
 
-    # TODO: come back to this as may have to rethink how friend bets are added to bets
+    try:
+        result = first(db.fetch("""
+            SELECT b2.BET_ID AS friend_bet_id, b1.AMOUNT AS amount, b1.EVENT_ID AS event_id,
+            b2.USER_ID AS friend_user_id, b2.AMOUNT AS friend_amount
+            FROM BETS b1
+            LEFT JOIN BETS b2
+            ON b1.PAIRED_BET_ID = b2.BET_ID
+            WHERE b1.BET_ID = %s
+            AND b1.USER_ID = %s;
+        """ % (bet_id, uid)))
+        friend_bet_id = result['friend_bet_id']
+        amount = result['amount']
+        event_id = result['event_id']
+        friend_user_id = result['friend_user_id']
+        friend_amount = result['friend_amount']
+        active_status = 'active'
+        if first:
+            db.execute("""
+                UPDATE USERS
+                SET BALANCE = BALANCE - %s
+                WHERE USER_ID = %s;
+            """ % (amount, uid))
+            db.multi_execute("""
+                UPDATE BETS
+                SET STATUS = '%s', EST_PROFIT = %s
+                WHERE BET_ID = %s;
+                UPDATE BETS
+                SET STATUS = '%s', EST_PROFIT = %s
+                WHERE BET_ID = %s;
+            """ % (active_status, friend_amount, bet_id, active_status, amount, friend_bet_id))
+    except OperationalError as e:
+        error_code, error_message = e.args
+        if error_code == 3819:
+            return Response(body={"error": "insufficient funds"}, status_code=502)
+        else:
+            raise e
+
+    payload = first(db.fetch("""
+        SELECT u.EMAIL AS email, u.FIRST_NAME AS first_name, b.ON_TEAM AS 'on', e.HOME AS home,
+        e.AWAY AS away, e.DTM AS dtm, b.AMOUNT AS amount, f.FIRST_NAME AS friendFirstName, f.LAST_NAME AS friendLastName,
+        b.ODDS AS odds
+        FROM USERS u
+        LEFT JOIN BETS b
+        ON u.USER_ID = b.USER_ID
+        LEFT JOIN EVENT e
+        ON b.EVENT_ID = e.EVENT_ID
+        LEFT JOIN USERS f
+        ON f.USER_ID = b.FRIEND
+        WHERE u.USER_ID = %s
+        AND f.USER_ID = %s
+        AND b.BET_ID = %s
+        AND b.EVENT_ID = %s
+        AND e.EVENT_ID = %s;
+    """ % (friend_user_id, uid, friend_bet_id, event_id, event_id)))
+
+    payload['date'] = datetime_to_display_format(payload['dtm'])
+    del payload['dtm']
+
+    payload['with'] = f"{payload['friendFirstName']} {payload['friendLastName']}"
+    del payload['friendFirstName']
+    del payload['friendLastName']
+
+    mailer = Mailer()
+    mailer.send_social_bet_accepted_email(payload=payload)
+
+    return Response(status_code=204)
 
 
 @app.route("/bet/social/cancel", methods=["PUT"])
 # @login_required
 def bet_social_cancel(request: Request):
+    """
+    Get bet amount and paired bet id
+    Remove bet and paired bet
+    Add amount back to user account balance
+    """
     uid = request.body['uid']
     bet_id = request.body['betId']
 
     db = MySql()
 
-    # TODO: come back after figuring out social bets
+    response = first(db.fetch("""
+        SELECT PAIRED_BET_ID AS paired_bet_id, AMOUNT AS amount
+        FROM BETS
+        WHERE BET_ID = %s
+        AND USER_ID = %s;
+    """ % (bet_id, uid)))
+    paired_bet_id, amount = response['paired_bet_id'], response['amount']
+
+    db.execute("""
+        DELETE FROM BETS
+        WHERE BET_ID IN (%s, %s);
+    """ % bet_id, paired_bet_id)
+
+    db.execute("""
+        UPDATE USERS
+        SET BALANCE = BALANCE + %s
+        WHERE USER_ID = %s;
+    """ % (amount, uid))
+
+    return Response(status_code=204)
 
 
 @app.route("/bet/social/decline", methods=["PUT"])
 @login_required
 def bet_social_decline(request: Request):
+    """
+    Get paired bet amount and paired bet id and paired bet user id
+    Remove bet and paired bet
+    Add paired bet amount to paired bet user
+    Get details for email
+    Send email to paired bet user
+    """
     uid = request.body['uid']
     bet_id = request.body['betId']
 
     db = MySql()
 
-    # TODO: come back after figuring out social bets
+    response = first(db.fetch("""
+        SELECT b1.PAIRED_BET_ID AS paired_bet_id, b2.AMOUNT AS paired_bet_amount,
+        b2.USER_ID AS paired_bet_user_id, b1.EVENT_ID AS event_id
+        FROM BETS b1
+        LEFT JOIN BETS b2
+        ON b1.PAIRED_BET_ID = b2.BET_ID
+        WHERE b1.BET_ID = %s
+        AND b1.USER_ID = %s;
+    """ % (bet_id, uid)))
+    paired_bet_id = response['paired_bet_id']
+    paired_bet_amount = response['paired_bet_amount']
+    paired_bet_user_id = response['paired_bet_user_id']
+    event_id = response['event_id']
+
+    db.execute("""
+        DELETE FROM BETS
+        WHERE BET_ID IN (%s, %s);
+    """ % (bet_id, paired_bet_id))
+
+    db.execute("""
+        UPDATE USERS
+        SET BALANCE = BALANCE + %s
+        WHERE USER_ID = %s;
+    """ % (paired_bet_amount, paired_bet_user_id))
+
+    payload = first(db.fetch("""
+        SELECT u.EMAIL AS email, u.FIRST_NAME AS first_name, b.ON_TEAM AS 'on', e.HOME AS home,
+        e.AWAY AS away, e.DTM AS dtm, b.AMOUNT AS amount, f.FIRST_NAME AS friendFirstName, f.LAST_NAME AS friendLastName,
+        b.ODDS AS odds
+        FROM USERS u
+        LEFT JOIN BETS b
+        ON u.USER_ID = b.USER_ID
+        LEFT JOIN EVENT e
+        ON b.EVENT_ID = e.EVENT_ID
+        LEFT JOIN USERS f
+        ON f.USER_ID = b.FRIEND
+        WHERE u.USER_ID = %s
+        AND f.USER_ID = %s
+        AND b.BET_ID = %s
+        AND b.EVENT_ID = %s
+        AND e.EVENT_ID = %s;
+    """ % (uid, paired_bet_user_id, paired_bet_id, event_id, event_id)))
+
+    payload['date'] = datetime_to_display_format(payload['dtm'])
+    del payload['dtm']
+
+    payload['with'] = f"{payload['friendFirstName']} {payload['friendLastName']}"
+    del payload['friendFirstName']
+    del payload['friendLastName']
+
+    mailer = Mailer()
+    mailer.send_social_bet_declined_email(payload=payload)
 
 
 @app.route("/bet/exchange/cancel", methods=["PUT"])
@@ -609,4 +844,4 @@ def bet_exchange_cancel(request: Request):
         PartitionKey=str(uid)
     )
 
-
+    return Response(status_code=202)
