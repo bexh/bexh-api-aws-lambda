@@ -3,6 +3,7 @@ from main.src.utils import Response, Request, dec_to_float, first, iso_format, t
 from main.src.db import login_required, MySql, DynamoDb
 from main.src.logger import LoggerFactory
 from main.src.mailer import Mailer
+from main.src.domain_model import MarketBetOrder, LimitBetOrder
 
 from pymysql import OperationalError
 from validate_email import validate_email
@@ -26,7 +27,7 @@ def portfolio_overview(request: Request):
         SELECT SUM(AMOUNT) AS inPlay, SUM(EST_PROFIT) AS toWin FROM BETS
         WHERE USER_ID = %s
         AND STATUS IN (%s);
-    """ % uid, active_statuses)
+    """ % (uid, active_statuses))
 
     vig_savings = db.fetch("""
         SELECT SUM(AMOUNT + EST_PROFIT)*0.1 AS vigSavings FROM BETS
@@ -277,7 +278,25 @@ def event_make_bet_market(request: Request):
         SELECT last_insert_id();
     """ % (uid, event_id, market, odds, amount, 0, on, bet_type, status))[1][0]["last_insert_id()"]
 
-    payload = {**request.body, "bet_id": bet_id, "type": bet_type}
+    sport = first(db.fetch("""
+        SELECT SPORT AS sport FROM EVENT
+        WHERE EVENT_ID = '%s';
+    """ % event_id))['sport']
+
+    market_bet = MarketBetOrder(
+        event_id=event_id,
+        sport=sport,
+        bet_id=bet_id,
+        brokerage_id=1,
+        user_id=uid,
+        amount=amount,
+        order_type=bet_type,
+        on_team_abbrev=on,
+    )
+    payload = {
+        "action": "NEW_MARKET_BET",
+        "value": vars(market_bet)
+    }
     stream_name = os.environ.get('EXCHANGE_BET_KINESIS_STREAM')
 
     try:
@@ -294,7 +313,7 @@ def event_make_bet_market(request: Request):
             UPDATE USERS
             SET BALANCE = BALANCE + %s
             WHERE USER_ID = %s;
-        """ % amount)
+        """ % (amount, uid))
         db.execute("""
             DELETE FROM BETS
             WHERE BET_ID = %s
@@ -341,7 +360,27 @@ def event_make_bet_limit(request: Request):
         SELECT last_insert_id();
     """ % (uid, event_id, market, odds, amount, 0, on, bet_type, status))[1][0]["last_insert_id()"]
 
-    payload = {**request.body, "bet_id": bet_id, "type": bet_type}
+    sport = first(db.fetch("""
+        SELECT SPORT AS sport FROM EVENT
+        WHERE EVENT_ID = '%s';
+    """ % event_id))['sport']
+
+    limit_bet = LimitBetOrder(
+        event_id=event_id,
+        sport=sport,
+        bet_id=bet_id,
+        brokerage_id=1,
+        user_id=uid,
+        amount=amount,
+        odds=odds,
+        order_type=bet_type,
+        on_team_abbrev=on,
+    )
+
+    payload = {
+        "action": "NEW_LIMIT_BET",
+        "value": vars(limit_bet)
+    }
     stream_name = os.environ.get('EXCHANGE_BET_KINESIS_STREAM')
 
     try:
@@ -358,7 +397,7 @@ def event_make_bet_limit(request: Request):
             UPDATE USERS
             SET BALANCE = BALANCE + %s
             WHERE USER_ID = %s;
-        """ % amount)
+        """ % (amount, uid))
         db.execute("""
             DELETE FROM BETS
             WHERE BET_ID = %s
